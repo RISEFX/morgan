@@ -86,6 +86,7 @@ class TestMirrorer:
             index_path=temp_index_path,
             index_url="https://pypi.org/simple/",
             config=os.path.join(temp_index_path, "morgan.ini"),
+            mirror_all_versions=False,
         )
 
         mirrorer = Mirrorer(args)
@@ -96,12 +97,14 @@ class TestMirrorer:
         assert mirrorer.envs["test_env"]["python_version"] == "3.10"
         assert mirrorer.envs["test_env"]["sys_platform"] == "linux"
         assert mirrorer.envs["test_env"]["platform_machine"] == "x86_64"
+        assert mirrorer.mirror_all_versions == False
 
     def test_server_file_copying(self, temp_index_path):
         args = argparse.Namespace(
             index_path=temp_index_path,
             index_url=PYPI_ADDRESS,
             config=os.path.join(temp_index_path, "morgan.ini"),
+            mirror_all_versions=False,
         )
         mirrorer = Mirrorer(args)
 
@@ -124,6 +127,7 @@ class TestMirrorer:
             index_path=temp_index_path,
             index_url=PYPI_ADDRESS,
             config=os.path.join(temp_index_path, "morgan.ini"),
+            mirror_all_versions=False,
         )
         mirrorer = Mirrorer(args)
 
