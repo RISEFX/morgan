@@ -105,6 +105,7 @@ class TestMirrorer:
             mirror_all_versions=False,
             package_type_regex="(whl|zip|tar.gz)",
             mirror_all_wheels=False,
+            target_url=None,
         )
 
         mirrorer = Mirrorer(args)
@@ -125,6 +126,7 @@ class TestMirrorer:
             mirror_all_versions=False,
             package_type_regex="(whl|zip|tar.gz)",
             mirror_all_wheels=False,
+            target_url=None,
         )
         mirrorer = Mirrorer(args)
 
@@ -151,6 +153,7 @@ class TestMirrorer:
             mirror_all_versions=False,
             package_type_regex="(whl|zip|tar.gz)",
             mirror_all_wheels=False,
+            target_url=None,
         )
         mirrorer = Mirrorer(args)
 
@@ -201,6 +204,7 @@ class TestFilterFiles:
                 mirror_all_versions=mirror_all_versions,
                 package_type_regex=r"(whl|zip|tar\.gz)",
                 mirror_all_wheels=mirror_all_wheels,
+                target_url=None,
             )
             return Mirrorer(args)
 
