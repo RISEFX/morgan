@@ -10,7 +10,7 @@ import traceback
 import urllib.parse
 import urllib.request
 import zipfile
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import packaging.requirements
 import packaging.specifiers
@@ -44,6 +44,9 @@ class Mirrorer:
         self.index_path = args.index_path
         self.index_url = args.index_url
         self.package_type_regex: str = args.package_type_regex
+        self.package_type_fallback_regex: Optional[str] = (
+            args.package_type_fallback_regex
+        )
         self.config = configparser.ConfigParser()
         self.config.read(args.config)
         self.envs = {}
@@ -199,13 +202,22 @@ class Mirrorer:
         requirement: packaging.requirements.Requirement,
         files: Iterable[dict],
     ) -> Iterable[dict]:
-        # remove files with unsupported extensions
-        pattern: str = rf"\.{self.package_type_regex}$"
-        files = list(
-            filter(
-                lambda file: re.search(pattern, file["filename"]), files
-            )
-        )
+
+        # Apply primary filter
+        pattern = rf"\.{self.package_type_regex}$"
+        filtered_files = [
+            file for file in files if re.search(pattern, file["filename"])
+        ]
+
+        # If primary filter returns no results and fallback exists, use fallback
+        if not filtered_files and self.package_type_fallback_regex:
+            print(f"\tUsing fallback pattern for {requirement}.")
+            fallback_pattern = rf"\.{self.package_type_fallback_regex}$"
+            filtered_files = [
+                file for file in files if re.search(fallback_pattern, file["filename"])
+            ]
+
+        files = filtered_files
 
         # parse versions and platform tags for each file
         for file in files:
@@ -512,6 +524,8 @@ def main():
     flags, options and arguments.
     """
 
+    FULL_PACKAGE_TYPE_REGEX: str = r"(whl|zip|tar\.gz)"
+
     def my_url(arg):
         # url -> url/ without params
         # https://stackoverflow.com/a/73719022
@@ -556,9 +570,23 @@ def main():
     parser.add_argument(
         "--package-type-regex",
         dest="package_type_regex",
-        default=r"(whl|zip|tar\.gz)",
+        default=FULL_PACKAGE_TYPE_REGEX,
         type=str,
         help="Regular expression to filter which package file types are mirrored",
+    )
+    parser.add_argument(
+        "--package-type-fallback-regex",
+        dest="package_type_fallback_regex",
+        default=None,
+        type=str,
+        nargs="?",
+        const=FULL_PACKAGE_TYPE_REGEX,
+        help=(
+            'Fall back to full type regex if "--package-type-regex" regex did not match '
+            'any file on registry. '
+            'Useful in case you only want to fetch sdists ("tar.gz"), but some packages '
+            "only provide wheels (e.g. pywin32)."
+        ),
     )
 
     server.add_arguments(parser)
@@ -578,6 +606,14 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if (
+        args.package_type_fallback_regex
+        and args.package_type_regex == FULL_PACKAGE_TYPE_REGEX
+    ):
+        parser.error(
+            f'--package-type-fallback-regex requires --package-type-regex to be set to anything but "{FULL_PACKAGE_TYPE_REGEX}".'
+        )
 
     # These commands do not require a configuration file and therefore should
     # be executed prior to sanity checking the configuration
