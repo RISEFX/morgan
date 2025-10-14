@@ -2,7 +2,13 @@ import argparse
 import hashlib
 import os
 import tempfile
+import pytest
 
+from types import SimpleNamespace
+
+import packaging.requirements
+
+from morgan import Mirrorer
 import pytest
 from pathlib import Path
 
@@ -60,7 +66,7 @@ class TestParseRequirement:
         req = parse_requirement("Requests-HTTP")
         assert req.name == "requests-http"
 
-
+# pyright: ignore[reportMissingParameterType, reportUnknownParameterType]
 class TestMirrorer:
     @pytest.fixture
     def temp_index_path(self, tmpdir):
@@ -148,3 +154,55 @@ class TestMirrorer:
             assert (
                 file.read() == f"sha256={expected_hash}"
             ), "Hash file content should be correctly formatted"
+
+    @pytest.fixture
+    def make_mirrorer(self, temp_index_path, all_versions):
+        args = SimpleNamespace(
+            index_path=temp_index_path,
+            index_url="https://example.com/simple",
+            all_versions=all_versions,
+            config=str(temp_index_path / "config.ini"),
+        )
+        return Mirrorer(args)
+
+    @staticmethod
+    @pytest.fixture
+    def make_file(filename, **overrides):
+        fileinfo = {
+            "filename": filename,
+            "hashes": {"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+            "url": f"https://example.com/{filename}",
+        }
+        fileinfo.update(overrides)
+        return fileinfo
+
+    @pytest.fixture
+    def make_files(make_file):
+        return [
+            make_file("sample_package-1.6.0.tar.gz"),
+            make_file("sample_package-1.5.2.tar.gz"),
+            make_file("sample_package-1.5.1.tar.gz"),
+            make_file("sample_package-1.4.9.tar.gz"),
+        ]
+
+    @pytest.fixture
+    def extract_versions(files):
+        return [str(file["version"]) for file in files]
+
+
+    def test_filter_files_returns_latest_version_by_default(tmp_path, make_mirrorer):
+        mirrorer = make_mirrorer(tmp_path, all_versions=False)
+        requirement = packaging.requirements.Requirement("sample_package>=1.5.1")
+
+        filtered_files = mirrorer._filter_files(requirement, make_files())
+
+        assert extract_versions(filtered_files) == ["1.6.0"]
+
+
+    def test_filter_files_returns_all_versions_when_requested(tmp_path, make_mirrorer):
+        mirrorer = make_mirrorer(tmp_path, all_versions=True)
+        requirement = packaging.requirements.Requirement("sample_package>=1.5.1")
+
+        filtered_files = mirrorer._filter_files(requirement, make_files())
+
+        assert extract_versions(filtered_files) == ["1.6.0", "1.5.2", "1.5.1"]
